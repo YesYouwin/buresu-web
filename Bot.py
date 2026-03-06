@@ -40,7 +40,8 @@ async def on_ready():
     time="Match Time",
     date="Match Date",
     map_name="Map",
-    timezone="Timezone"
+    timezone="Timezone",
+    format="Format"
 )
 
 # DROPDOWNS
@@ -53,6 +54,7 @@ async def on_ready():
     ],
 
     map_name=[
+        app_commands.Choice(name="TBD", value="To Be Decided through mapban.gg"),
         app_commands.Choice(name="Abyss", value="Abyss"),
         app_commands.Choice(name="Ascent", value="Ascent"),
         app_commands.Choice(name="Bind", value="Bind"),
@@ -72,6 +74,13 @@ async def on_ready():
         app_commands.Choice(name="SGT", value="SGT"),
         app_commands.Choice(name="GMT", value="GMT"),
         app_commands.Choice(name="PST", value="PST")
+    ],
+
+    format=[
+        app_commands.Choice(name="BO1", value="Best Of 1 Map")
+        app_commands.Choice(name="BO3", value="Best Of 3 Maps")
+        app_commands.Choice(name="BO5", value="Best Of 5 Maps")
+        app_commands.Choice(name="MR24", value="Max Rounds 24")
     ]
     
 )
@@ -97,6 +106,7 @@ async def scrim(
 > **Teams:** {team_a} VS {team_b}
 > **Time:** {time} {timezone.value}
 > **Day/Date:** {formatted_date}
+> **Format:** {format}
 > **Map:** {map_name.value}
 
 ⚠️ **Note**  
