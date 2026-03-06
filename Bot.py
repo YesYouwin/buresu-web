@@ -33,7 +33,7 @@ async def scrim(ctx, scrim_type, teams, time, timezone, date, map_name):
         sgt_time = convert_to_sgt(time)
 
         embed = discord.Embed(
-            title="🎮 Scrim | Scrim Schedule",
+            title="{scrim_type} Schedule",
             color=discord.Color.red()
         )
 
