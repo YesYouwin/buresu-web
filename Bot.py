@@ -77,9 +77,9 @@ async def on_ready():
     ],
 
     format=[
-        app_commands.Choice(name="BO1", value="Best Of 1 Map")
-        app_commands.Choice(name="BO3", value="Best Of 3 Maps")
-        app_commands.Choice(name="BO5", value="Best Of 5 Maps")
+        app_commands.Choice(name="BO1", value="Best Of 1 Map"),
+        app_commands.Choice(name="BO3", value="Best Of 3 Maps"),
+        app_commands.Choice(name="BO5", value="Best Of 5 Maps"),
         app_commands.Choice(name="MR24", value="Max Rounds 24")
     ]
     
@@ -93,12 +93,20 @@ async def scrim(
     time: str,
     date: str,
     map_name: app_commands.Choice[str],
-    timezone: app_commands.Choice[str]
+    timezone: app_commands.Choice[str],
+    format: app_commands.Choice[str]
 ):
 
-    parsed_date = datetime.strptime(date, "%d/%m/%Y")
-    day_name = parsed_date.strftime("%A")
-    formatted_date = f"{date} [{day_name}]"
+    try:
+        parsed_date = datetime.strptime(date, "%d/%m/%Y")
+        day_name = parsed_date.strftime("%A")
+        formatted_date = f"{date} [{day_name}]"
+    except ValueError:
+        await interaction.response.send_message(
+            "❌ Invalid date format. Please use **DD/MM/YYYY** (example: 07/03/2026)",
+            ephemeral=True
+        )
+        return
 
     message = f"""
 # 📅 {scrim_type.value} SCHEDULE
@@ -106,7 +114,7 @@ async def scrim(
 > **Teams:** {team_a} VS {team_b}
 > **Time:** {time} {timezone.value}
 > **Day/Date:** {formatted_date}
-> **Format:** {format}
+> **Format:** {format.value}
 > **Map:** {map_name.value}
 
 ⚠️ **Note**  
