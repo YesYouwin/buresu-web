@@ -51,13 +51,15 @@ class PlayerLogs(commands.Cog):
             emoji = "<:Negative:1438979843252289656>"
             color = discord.Color.red()
 
+        year = datetime.now().year
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 
         embed = discord.Embed(
-            title=f"{emoji} {action.value}",
             description=f"""
 {divider}
+
+{emoji} {action.value}
 
 {discordname.mention}
 
@@ -75,7 +77,7 @@ class PlayerLogs(commands.Cog):
         )
 
         embed.set_thumbnail(url=discordname.display_avatar.url)
-        embed.set_footer(text="Player Logs")
+        embed.set_footer(text="© Buresu • *{year}*")
 
         await interaction.response.send_message(embed=embed)
 
