@@ -97,7 +97,7 @@ class Scrim(commands.Cog):
 
         # Build the plain text schedule
         schedule_message = (
-            f"**{scrim_type.value} SCHEDULE**\n\n"
+            f"# **{scrim_type.value} SCHEDULE**\n\n"
             f"**Teams:** {team_a_display} VS {team_b_display}\n"
             f"**Time:** {time} {timezone.value}\n"
             f"**Day/Date:** {formatted_date}\n"
