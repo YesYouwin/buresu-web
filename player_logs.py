@@ -67,7 +67,10 @@ def load_logs():
 
 def save_logs(logs):
     try:
+        print("Saving logs to Drive...")
+
         file_id = get_file_id()
+        print("Existing file ID:", file_id)
 
         data = json.dumps(logs, indent=4)
         fh = io.BytesIO(data.encode())
@@ -79,22 +82,28 @@ def save_logs(logs):
         )
 
         if file_id:
+            print("Updating existing file")
+
             service.files().update(
                 fileId=file_id,
                 media_body=media
             ).execute()
 
         else:
+            print("Creating new player_logs.json file")
+
             file_metadata = {
                 "name": FILE_NAME,
                 "parents": [FOLDER_ID]
             }
 
-            service.files().create(
+            file = service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields="id"
             ).execute()
+
+            print("File created:", file["id"])
 
     except Exception as e:
         print("Save logs error:", e)
@@ -104,6 +113,12 @@ class PlayerLogs(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+
+    @app_commands.command(name="drivetest")
+    async def drivetest(self, interaction: discord.Interaction):
+        logs = [{"test": "working"}]
+        save_logs(logs)
+        await interaction.response.send_message("Drive test complete", ephemeral=True)
 
     @app_commands.command(name="playerlogs", description="Create a formatted player log")
     @is_staff()
@@ -177,6 +192,9 @@ class PlayerLogs(commands.Cog):
 
         logs = load_logs()
 
+        if logs is None:
+            logs = []
+        
         logs.append({
             "action": action.value,
             "discord_id": str(discordname.id),
