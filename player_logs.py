@@ -142,25 +142,61 @@ class PlayerLogs(commands.Cog):
             await interaction.response.send_message("❌ No logs found for that search.", ephemeral=True)
             return
 
-        # Create embed for results
-        embed = discord.Embed(
-            title=f"Player History for `{search}`",
-            color=discord.Color.blue()
-        )
+        divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        # Respond immediately so the interaction doesn't fail
+        await interaction.response.send_message(f"📜 Found {len(results)} log(s) for `{search}`:", ephemeral=True)
 
         for log in results:
-            embed.add_field(
-                name=f"{log['action']} - {log['ign']}",
-                value=f"**Discord ID:** <@{log['discord_id']}>\n"
-                      f"**Teams:** {log['team1']} ➜ {log['team2']}\n"
-                      f"**Date:** {log['date']}\n"
-                      f"**Reason:** {log['reason']}\n"
-                      f"[Tracker]({log['trackerid']})",
-                inline=False
+            # Try to get Discord user object
+            try:
+                user = await self.bot.fetch_user(int(log["discord_id"]))
+                mention = user.mention
+                avatar_url = user.display_avatar.url
+            except:
+                mention = f"<@{log['discord_id']}>"
+                avatar_url = None
+
+            # Emoji and color based on action
+            if log["action"] in ["Recruitment", "Promotion"]:
+                emoji = "<:Plus:1438977678890766517>"
+                color = discord.Color.green()
+            else:
+                emoji = "<:Negative:1438979843252289656>"
+                color = discord.Color.red()
+
+            # Format date
+            try:
+                parsed_date = datetime.strptime(log["date"], "%d/%m/%Y")
+                day_name = parsed_date.strftime("%A")
+                formatted_date = f"{log['date']} [{day_name}]"
+            except:
+                formatted_date = log["date"]
+
+            embed = discord.Embed(
+                description=f"""
+{divider}
+**{emoji} {log['action']}**
+
+{mention}
+
+**IGN -** [{log['ign']}]({log['trackerid']})
+
+**{log['team1']} ➜ {log['team2']}**
+
+**Date -** {formatted_date}
+
+**Reason —** *{log['reason']}*
+{divider}
+""",
+                color=color
             )
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+            if avatar_url:
+                embed.set_thumbnail(url=avatar_url)
+            embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
+            await interaction.followup.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(PlayerLogs(bot))
