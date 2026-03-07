@@ -58,7 +58,6 @@ class PlayerLogs(commands.Cog):
         embed = discord.Embed(
             description=f"""
 {divider}
-
 {emoji} {action.value}
 
 {discordname.mention}
@@ -70,7 +69,6 @@ class PlayerLogs(commands.Cog):
 **Date -** {formatted_date}
 
 **Reason —** *{reason}*
-
 {divider}
 """,
             color=color
