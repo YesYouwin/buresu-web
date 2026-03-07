@@ -44,7 +44,6 @@ class PlayerLogs(commands.Cog):
             return
 
 
-        # Determine emoji + embed color
         if action.value in ["Recruitment", "Promotion"]:
             emoji = "<:Plus:1438977678890766517>"
             color = discord.Color.green()
@@ -52,19 +51,25 @@ class PlayerLogs(commands.Cog):
             emoji = "<:Negative:1438979843252289656>"
             color = discord.Color.red()
 
+        divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
 
         embed = discord.Embed(
             title=f"{emoji} {action.value}",
             description=f"""
-**{emoji} {formatted_date}**
+{divider}
 
 {discordname.mention}
 
-**IGN** — [{ign}]({trackerid})
+**IGN -** [{ign}]({trackerid})
 
-**{team1}** ➜ **{team2}**
+**{team1} ➜ {team2}**
 
-**Reason** — *{reason}*
+**Date -** {formatted_date}
+
+**Reason —** *{reason}*
+
+{divider}
 """,
             color=color
         )
