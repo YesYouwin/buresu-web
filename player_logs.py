@@ -43,6 +43,7 @@ class PlayerLogs(commands.Cog):
             )
             return
 
+
         # Determine emoji + embed color
         if action.value in ["Recruitment", "Promotion"]:
             emoji = "<:Plus:1438977678890766517>"
@@ -51,41 +52,24 @@ class PlayerLogs(commands.Cog):
             emoji = "<:Negative:1438979843252289656>"
             color = discord.Color.red()
 
+
         embed = discord.Embed(
-            title=f"{action.value}",
+            title=f"{emoji} {action.value}",
+            description=f"""
+**{emoji} {formatted_date}**
+
+{discordname.mention}
+
+**IGN** — [{ign}]({trackerid})
+
+**{team1}** ➜ **{team2}**
+
+**Reason** — *{reason}*
+""",
             color=color
         )
 
-        embed.add_field(
-            name="Date",
-            value=f"{emoji} {formatted_date}",
-            inline=False
-        )
-
-        embed.add_field(
-            name="Player",
-            value=discordname.mention,
-            inline=False
-        )
-
-        embed.add_field(
-            name="IGN",
-            value=f"[{ign}]({trackerid})",
-            inline=False
-        )
-
-        embed.add_field(
-            name="Team Change",
-            value=f"**{team1}** ➜ **{team2}**",
-            inline=False
-        )
-
-        embed.add_field(
-            name="Reason",
-            value=f"*{reason}*",
-            inline=False
-        )
-
+        embed.set_thumbnail(url=discordname.display_avatar.url)
         embed.set_footer(text="Player Logs")
 
         await interaction.response.send_message(embed=embed)
