@@ -51,7 +51,6 @@ class PlayerLogs(commands.Cog):
             emoji = "<:Negative:1438979843252289656>"
             color = discord.Color.red()
 
-        year = datetime.now().year
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 
@@ -74,10 +73,18 @@ class PlayerLogs(commands.Cog):
             color=color
         )
 
+        
         embed.set_thumbnail(url=discordname.display_avatar.url)
-        embed.set_footer(text="© Buresu • {year}")
+        embed.set_footer(text=f"© Buresu • {datetime.now().year}")
+        
+        log_channel = self.bot.get_channel(1443545539445653604)
 
-        await interaction.response.send_message(embed=embed)
+        if log_channel is None:
+            await interaction.response.send_message("❌ Log channel not found.", ephemeral=True)
+            return
+
+        await log_channel.send(embed=embed)
+        await interaction.response.send_message("✅ Player log created.", ephemeral=True)
 
 
 async def setup(bot):
