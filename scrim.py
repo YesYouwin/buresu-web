@@ -23,7 +23,7 @@ class Scrim(commands.Cog):
         scrim_type=[
             app_commands.Choice(name="In-Houses", value="<:InHouses:1442182642920587324> IN-HOUSES"),
             app_commands.Choice(name="Scrim", value="<:Scrim:1456784764798374132> SCRIM"),
-            app_commands.Choice(name="Tournament", value="<a:Red_Fire:1470755261676519436> TOURNAMENT")
+            app_commands.Choice(name="Tournament", value="<a:Trophy:1470762038094729329> TOURNAMENT")
         ],
         timezone=[
             app_commands.Choice(name="IST", value="IST"),
@@ -101,11 +101,11 @@ class Scrim(commands.Cog):
         # Build the plain text schedule
         schedule_message = (
             f"# **{scrim_type.value} SCHEDULE**\n\n"
-            f"**Teams:** {team_a_display} VS {team_b_display}\n"
-            f"**Time:** {time} {timezone.value}\n"
-            f"**Day/Date:** {formatted_date}\n"
-            f"**Format:** {format.value}\n"
-            f"**Map:** {map_name}\n\n"
+            f"> **Teams:** {team_a_display} VS {team_b_display}\n"
+            f"> **Time:** {time} {timezone.value}\n"
+            f"> **Day/Date:** {formatted_date}\n"
+            f"> **Format:** {format.value}\n"
+            f"> **Map:** {map_name}\n\n"
             f"⚠️ **Note:**\n"
             f"- <@&1442456929321619556> are responsible for any player's absence.\n"
             f"- Players must inform about any discrepancy beforehand so the event runs smoothly."
