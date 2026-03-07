@@ -2,13 +2,14 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
-
+from utils import is_staff
 
 class Scrim(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     @app_commands.command(name="scrim", description="Create a Scrim Schedule")
+    @is_staff()
     @app_commands.describe(
         scrim_type="Type of Scrim",
         team_a="First Team (role or name)",
