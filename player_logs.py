@@ -164,17 +164,28 @@ class PlayerLogs(commands.Cog):
             await log_channel.send(embed=embed)
 
         try:
-            await asyncio.to_thread(
-                save_log,
-                action.value,
-                str(discordname.id),
-                ign,
-                team1,
-                team2,
-                date,
-                trackerid,
-                reason
+            await asyncio.wait_for(
+                asyncio.to_thread(
+                    save_log,
+                    action.value,
+                    str(discordname.id),
+                    ign,
+                    team1,
+                    team2,
+                    date,
+                    trackerid,
+                    reason
+                ),
+                timeout=10
             )
+
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                "❌ Database request timed out.",
+                ephemeral=True
+            )
+            return
+        
         except Exception:
             error_msg = traceback.format_exc()
 
@@ -203,7 +214,10 @@ class PlayerLogs(commands.Cog):
             search = search.replace("<@", "").replace(">", "").replace("!", "")
 
         try:
-            rows = await asyncio.to_thread(search_logs, search)
+            rows = await asyncio.wait_for(
+                asyncio.to_thread(search_logs, search),
+                timeout=10
+            )        
         except Exception:
             error_msg = traceback.format_exc()
 
