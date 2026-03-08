@@ -35,6 +35,7 @@ def return_conn(conn):
 # DATABASE FUNCTIONS
 # ----------------------------
 def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
+    print("Saving log to database...")
     conn = get_conn()
 
     try:
@@ -174,8 +175,16 @@ class PlayerLogs(commands.Cog):
                 trackerid,
                 reason
             )
-        except Exception as e:
-            print("Database error:", e)
+        except Exception:
+            error_msg = traceback.format_exc()
+
+            print(error_msg)
+
+            await interaction.followup.send(
+                f"❌ Database Error:\n```{error_msg[:1900]}```",
+                ephemeral=True
+            )
+            return
 
         await interaction.followup.send("✅ Player log created", ephemeral=True)
 
