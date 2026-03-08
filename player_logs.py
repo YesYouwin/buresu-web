@@ -90,7 +90,6 @@ class PlayerLogs(commands.Cog):
     # ------------------------
     @app_commands.command(name="playerlogs", description="Create a formatted player log")
     @is_staff()
-    print("Command entered /playerlogs")
     @app_commands.choices(
         action=[
             app_commands.Choice(name="Recruitment", value="Recruitment"),
@@ -205,7 +204,6 @@ class PlayerLogs(commands.Cog):
     # ------------------------
     @app_commands.command(name="playerhistory", description="Retrieve player history")
     @is_staff()
-    print("Command entered /playerhistory")
     async def playerhistory(self, interaction: discord.Interaction, search: str):
 
         await interaction.response.defer(ephemeral=True)
