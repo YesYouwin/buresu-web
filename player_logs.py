@@ -10,11 +10,13 @@ import os
 # DATABASE CONNECTION
 # ----------------------------
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set in environment variables!")
 
+
 def get_conn():
-    """Return a new connection to the database."""
+    """Create a new database connection."""
     return psycopg2.connect(DATABASE_URL, sslmode="require")
 
 
@@ -22,26 +24,34 @@ def get_conn():
 # DATABASE FUNCTIONS
 # ----------------------------
 def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
+    """Insert a player log into the database."""
     with get_conn() as conn:
         with conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO player_logs
                 (action, discord_id, ign, team1, team2, date, trackerid, reason)
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-            """, (action, discord_id, ign, team1, team2, date, trackerid, reason))
+                """,
+                (action, discord_id, ign, team1, team2, date, trackerid, reason),
+            )
 
 
 def search_logs(search):
+    """Search player logs by discord id, IGN, or date."""
     with get_conn() as conn:
         with conn.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT action, discord_id, ign, team1, team2, date, trackerid, reason
                 FROM player_logs
-                WHERE discord_id = %s
+                WHERE discord_id::text = %s
                 OR LOWER(ign) LIKE %s
                 OR date LIKE %s
                 ORDER BY id DESC
-            """, (search, f"%{search.lower()}%", f"%{search}%"))
+                """,
+                (search, f"%{search.lower()}%", f"%{search}%"),
+            )
             return cursor.fetchall()
 
 
@@ -58,12 +68,14 @@ class PlayerLogs(commands.Cog):
     # ------------------------
     @app_commands.command(name="playerlogs", description="Create a formatted player log")
     @is_staff()
-    @app_commands.choices(action=[
-        app_commands.Choice(name="Recruitment", value="Recruitment"),
-        app_commands.Choice(name="Promotion", value="Promotion"),
-        app_commands.Choice(name="Relegation", value="Relegation"),
-        app_commands.Choice(name="Removed", value="Removed")
-    ])
+    @app_commands.choices(
+        action=[
+            app_commands.Choice(name="Recruitment", value="Recruitment"),
+            app_commands.Choice(name="Promotion", value="Promotion"),
+            app_commands.Choice(name="Relegation", value="Relegation"),
+            app_commands.Choice(name="Removed", value="Removed"),
+        ]
+    )
     async def playerlogs(
         self,
         interaction: discord.Interaction,
@@ -74,11 +86,12 @@ class PlayerLogs(commands.Cog):
         team1: str,
         team2: str,
         trackerid: str,
-        reason: str
+        reason: str,
     ):
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True)
 
+        await interaction.response.defer(ephemeral=True)
+
+        # Validate date
         try:
             parsed = datetime.strptime(date, "%d/%m/%Y")
             formatted_date = f"{date} [{parsed.strftime('%A')}]"
@@ -88,8 +101,18 @@ class PlayerLogs(commands.Cog):
             )
             return
 
-        emoji = "<:Plus:1438977678890766517>" if action.value in ["Recruitment", "Promotion"] else "<:Negative:1438979843252289656>"
-        color = discord.Color.green() if action.value in ["Recruitment", "Promotion"] else discord.Color.red()
+        emoji = (
+            "<:Plus:1438977678890766517>"
+            if action.value in ["Recruitment", "Promotion"]
+            else "<:Negative:1438979843252289656>"
+        )
+
+        color = (
+            discord.Color.green()
+            if action.value in ["Recruitment", "Promotion"]
+            else discord.Color.red()
+        )
+
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         embed = discord.Embed(
@@ -108,18 +131,30 @@ class PlayerLogs(commands.Cog):
 **Reason —** *{reason}*
 {divider}
 """,
-            color=color
+            color=color,
         )
 
         embed.set_thumbnail(url=discordname.display_avatar.url)
         embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
+        # Send embed to log channel
         log_channel = self.bot.get_channel(1443545539445653604)
+
         if log_channel:
             await log_channel.send(embed=embed)
 
+        # Save to database
         try:
-            save_log(action.value, str(discordname.id), ign, team1, team2, date, trackerid, reason)
+            save_log(
+                action.value,
+                str(discordname.id),
+                ign,
+                team1,
+                team2,
+                date,
+                trackerid,
+                reason,
+            )
         except Exception as e:
             print("Database error:", e)
 
@@ -131,34 +166,32 @@ class PlayerLogs(commands.Cog):
     @app_commands.command(name="playerhistory", description="Retrieve player history")
     @is_staff()
     async def playerhistory(self, interaction: discord.Interaction, search: str):
-        if not interaction.response.is_done():
-            await interaction.response.defer(ephemeral=True)
 
-        def search_logs(search):
-            try:
-                with get_conn() as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute("""
-                            SELECT action, discord_id, ign, team1, team2, date, trackerid, reason
-                            FROM player_logs
-                            WHERE discord_id = %s
-                            OR LOWER(ign) LIKE %s
-                            OR date LIKE %s
-                            ORDER BY id DESC
-                    """, (search, f"%{search.lower()}%", f"%{search}%"))
-                    return cursor.fetchall()
-            except Exception as e:
-                print("search_logs exception:", e)
-                raise
+        await interaction.response.defer(ephemeral=True)
+
+        # Fetch logs
+        try:
+            rows = search_logs(search)
+        except Exception as e:
+            print("Database error:", e)
+            await interaction.followup.send(
+                "❌ Database error while searching logs.", ephemeral=True
+            )
+            return
 
         if not rows:
-            await interaction.followup.send("❌ No logs found", ephemeral=True)
+            await interaction.followup.send("❌ No logs found.", ephemeral=True)
             return
 
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        await interaction.followup.send(f"📜 Found {len(rows)} log(s) for `{search}`", ephemeral=True)
 
+        await interaction.followup.send(
+            f"📜 Found **{len(rows)}** log(s) for `{search}`", ephemeral=True
+        )
+
+        # Display logs
         for action, discord_id, ign, team1, team2, date, trackerid, reason in rows:
+
             try:
                 user = await self.bot.fetch_user(int(discord_id))
                 mention = user.mention
@@ -167,8 +200,17 @@ class PlayerLogs(commands.Cog):
                 mention = f"<@{discord_id}>"
                 avatar = None
 
-            emoji = "<:Plus:1438977678890766517>" if action in ["Recruitment", "Promotion"] else "<:Negative:1438979843252289656>"
-            color = discord.Color.green() if action in ["Recruitment", "Promotion"] else discord.Color.red()
+            emoji = (
+                "<:Plus:1438977678890766517>"
+                if action in ["Recruitment", "Promotion"]
+                else "<:Negative:1438979843252289656>"
+            )
+
+            color = (
+                discord.Color.green()
+                if action in ["Recruitment", "Promotion"]
+                else discord.Color.red()
+            )
 
             try:
                 parsed = datetime.strptime(date, "%d/%m/%Y")
@@ -192,18 +234,19 @@ class PlayerLogs(commands.Cog):
 **Reason —** *{reason}*
 {divider}
 """,
-                color=color
+                color=color,
             )
 
             if avatar:
                 embed.set_thumbnail(url=avatar)
+
             embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
-            try:
-                await interaction.followup.send(embed=embed)
-            except discord.NotFound:
-                return
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
 
+# ----------------------------
+# SETUP
+# ----------------------------
 async def setup(bot):
     await bot.add_cog(PlayerLogs(bot))
