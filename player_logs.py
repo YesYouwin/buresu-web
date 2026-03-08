@@ -3,129 +3,87 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from utils import is_staff
-import json
+import sqlite3
 import os
-import io
-import asyncio
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+DB_FILE = "player_logs.db"
 
 
-service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
 
-credentials = service_account.Credentials.from_service_account_info(
-    service_account_info,
-    scopes=["https://www.googleapis.com/auth/drive"]
-)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS player_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT,
+        discord_id TEXT,
+        ign TEXT,
+        team1 TEXT,
+        team2 TEXT,
+        date TEXT,
+        trackerid TEXT,
+        reason TEXT
+    )
+    """)
 
-service = build("drive", "v3", credentials=credentials)
-
-FILE_NAME = "player_logs.json"
-FOLDER_ID = "1BqiW_4RmbYMqmL1EzUKXA1Opj7PviDH5"
-
-
-def get_file_id():
-    try:
-        results = service.files().list(
-            q=f"name='{FILE_NAME}' and '{FOLDER_ID}' in parents",
-            spaces="drive",
-            fields="files(id,name)"
-        ).execute()
-
-        files = results.get("files", [])
-        return files[0]["id"] if files else None
-
-    except Exception as e:
-        print("Drive lookup error:", e)
-        return None
+    conn.commit()
+    conn.close()
 
 
-def load_logs():
-    try:
-        file_id = get_file_id()
+def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
 
-        if not file_id:
-            return []
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
 
-        request = service.files().get_media(fileId=file_id)
+    cursor.execute("""
+    INSERT INTO player_logs
+    (action, discord_id, ign, team1, team2, date, trackerid, reason)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        action,
+        discord_id,
+        ign,
+        team1,
+        team2,
+        date,
+        trackerid,
+        reason
+    ))
 
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-
-        fh.seek(0)
-
-        try:
-            return json.load(fh)
-        except:
-            return []
-
-    except Exception as e:
-        print("Load logs error:", e)
-        return []
+    conn.commit()
+    conn.close()
 
 
-def save_logs(logs):
-    try:
+def search_logs(search):
 
-        file_id = get_file_id()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
 
-        data = json.dumps(logs, indent=4)
+    cursor.execute("""
+    SELECT action, discord_id, ign, team1, team2, date, trackerid, reason
+    FROM player_logs
+    WHERE discord_id = ?
+    OR LOWER(ign) LIKE ?
+    OR date LIKE ?
+    """, (
+        search,
+        f"%{search.lower()}%",
+        f"%{search}%"
+    ))
 
-        fh = io.BytesIO(data.encode())
+    rows = cursor.fetchall()
 
-        media = MediaIoBaseUpload(
-            fh,
-            mimetype="application/json",
-            resumable=True
-        )
+    conn.close()
 
-        if file_id:
-
-            service.files().update(
-                fileId=file_id,
-                media_body=media
-            ).execute()
-
-        else:
-
-            file_metadata = {
-                "name": FILE_NAME,
-                "parents": [FOLDER_ID]
-            }
-
-            service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields="id"
-            ).execute()
-
-    except Exception as e:
-        print("Save logs error:", e)
+    return rows
 
 
 class PlayerLogs(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-
-
-    @app_commands.command(name="drivetest")
-    async def drivetest(self, interaction: discord.Interaction):
-
-        await interaction.response.defer(ephemeral=True)
-
-        await asyncio.to_thread(save_logs, [{"test": "working"}])
-
-        await interaction.followup.send(
-            "✅ Drive connection successful",
-            ephemeral=True
-        )
+        init_db()
 
 
     @app_commands.command(name="playerlogs", description="Create a formatted player log")
@@ -152,12 +110,10 @@ class PlayerLogs(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            parsed_date = datetime.strptime(date, "%d/%m/%Y")
-            day = parsed_date.strftime("%A")
-            formatted_date = f"{date} [{day}]"
+            parsed = datetime.strptime(date, "%d/%m/%Y")
+            formatted_date = f"{date} [{parsed.strftime('%A')}]"
 
         except ValueError:
-
             await interaction.followup.send(
                 "❌ Invalid date format. Use **DD/MM/YYYY**",
                 ephemeral=True
@@ -197,29 +153,22 @@ class PlayerLogs(commands.Cog):
         embed.set_thumbnail(url=discordname.display_avatar.url)
         embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
-
         log_channel = self.bot.get_channel(1443545539445653604)
 
         if log_channel:
             await log_channel.send(embed=embed)
 
 
-        logs = await asyncio.to_thread(load_logs)
-
-        logs.append({
-            "action": action.value,
-            "discord_id": str(discordname.id),
-            "ign": ign,
-            "team1": team1,
-            "team2": team2,
-            "date": date,
-            "trackerid": trackerid,
-            "reason": reason
-        })
-
-
-        await asyncio.to_thread(save_logs, logs)
-
+        save_log(
+            action.value,
+            str(discordname.id),
+            ign,
+            team1,
+            team2,
+            date,
+            trackerid,
+            reason
+        )
 
         await interaction.followup.send(
             "✅ Player log created",
@@ -233,22 +182,9 @@ class PlayerLogs(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        logs = await asyncio.to_thread(load_logs)
+        rows = search_logs(search)
 
-        results = []
-
-        for log in logs:
-
-            if (
-                search == log["discord_id"]
-                or search.lower() in log["ign"].lower()
-                or search in log["date"]
-            ):
-                results.append(log)
-
-
-        if not results:
-
+        if not rows:
             await interaction.followup.send(
                 "❌ No logs found",
                 ephemeral=True
@@ -258,25 +194,24 @@ class PlayerLogs(commands.Cog):
 
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-
         await interaction.followup.send(
-            f"📜 Found {len(results)} log(s) for `{search}`",
+            f"📜 Found {len(rows)} log(s) for `{search}`",
             ephemeral=True
         )
 
 
-        for log in results:
+        for action, discord_id, ign, team1, team2, date, trackerid, reason in rows:
 
             try:
-                user = await self.bot.fetch_user(int(log["discord_id"]))
+                user = await self.bot.fetch_user(int(discord_id))
                 mention = user.mention
                 avatar = user.display_avatar.url
             except:
-                mention = f"<@{log['discord_id']}>"
+                mention = f"<@{discord_id}>"
                 avatar = None
 
 
-            if log["action"] in ["Recruitment", "Promotion"]:
+            if action in ["Recruitment", "Promotion"]:
                 emoji = "<:Plus:1438977678890766517>"
                 color = discord.Color.green()
             else:
@@ -285,27 +220,26 @@ class PlayerLogs(commands.Cog):
 
 
             try:
-                parsed_date = datetime.strptime(log["date"], "%d/%m/%Y")
-                day = parsed_date.strftime("%A")
-                formatted_date = f"{log['date']} [{day}]"
+                parsed = datetime.strptime(date, "%d/%m/%Y")
+                formatted_date = f"{date} [{parsed.strftime('%A')}]"
             except:
-                formatted_date = log["date"]
+                formatted_date = date
 
 
             embed = discord.Embed(
                 description=f"""
 {divider}
-**{emoji} {log['action']}**
+**{emoji} {action}**
 
 {mention}
 
-**IGN -** [{log['ign']}]({log['trackerid']})
+**IGN -** [{ign}]({trackerid})
 
-**{log['team1']} ➜ {log['team2']}**
+**{team1} ➜ {team2}**
 
 **Date -** {formatted_date}
 
-**Reason —** *{log['reason']}*
+**Reason —** *{reason}*
 {divider}
 """,
                 color=color
