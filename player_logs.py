@@ -6,13 +6,13 @@ from utils import is_staff
 import json
 import os
 import io
+import asyncio
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 
-# Load Google credentials from Render environment variable
 service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
 
 credentials = service_account.Credentials.from_service_account_info(
@@ -36,6 +36,7 @@ def get_file_id():
 
         files = results.get("files", [])
         return files[0]["id"] if files else None
+
     except Exception as e:
         print("Drive lookup error:", e)
         return None
@@ -49,8 +50,8 @@ def load_logs():
             return []
 
         request = service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
 
+        fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, request)
 
         done = False
@@ -58,7 +59,11 @@ def load_logs():
             _, done = downloader.next_chunk()
 
         fh.seek(0)
-        return json.load(fh)
+
+        try:
+            return json.load(fh)
+        except:
+            return []
 
     except Exception as e:
         print("Load logs error:", e)
@@ -67,12 +72,11 @@ def load_logs():
 
 def save_logs(logs):
     try:
-        print("Saving logs to Drive...")
 
         file_id = get_file_id()
-        print("Existing file ID:", file_id)
 
         data = json.dumps(logs, indent=4)
+
         fh = io.BytesIO(data.encode())
 
         media = MediaIoBaseUpload(
@@ -82,7 +86,6 @@ def save_logs(logs):
         )
 
         if file_id:
-            print("Updating existing file")
 
             service.files().update(
                 fileId=file_id,
@@ -90,35 +93,40 @@ def save_logs(logs):
             ).execute()
 
         else:
-            print("Creating new player_logs.json file")
 
             file_metadata = {
                 "name": FILE_NAME,
                 "parents": [FOLDER_ID]
             }
 
-            file = service.files().create(
+            service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields="id"
             ).execute()
-
-            print("File created:", file["id"])
 
     except Exception as e:
         print("Save logs error:", e)
 
 
 class PlayerLogs(commands.Cog):
+
     def __init__(self, bot):
         self.bot = bot
 
 
     @app_commands.command(name="drivetest")
     async def drivetest(self, interaction: discord.Interaction):
-        logs = [{"test": "working"}]
-        save_logs(logs)
-        await interaction.response.send_message("Drive test complete", ephemeral=True)
+
+        await interaction.response.defer(ephemeral=True)
+
+        await asyncio.to_thread(save_logs, [{"test": "working"}])
+
+        await interaction.followup.send(
+            "✅ Drive connection successful",
+            ephemeral=True
+        )
+
 
     @app_commands.command(name="playerlogs", description="Create a formatted player log")
     @is_staff()
@@ -145,14 +153,17 @@ class PlayerLogs(commands.Cog):
 
         try:
             parsed_date = datetime.strptime(date, "%d/%m/%Y")
-            day_name = parsed_date.strftime("%A")
-            formatted_date = f"{date} [{day_name}]"
+            day = parsed_date.strftime("%A")
+            formatted_date = f"{date} [{day}]"
+
         except ValueError:
+
             await interaction.followup.send(
                 "❌ Invalid date format. Use **DD/MM/YYYY**",
                 ephemeral=True
             )
             return
+
 
         if action.value in ["Recruitment", "Promotion"]:
             emoji = "<:Plus:1438977678890766517>"
@@ -160,6 +171,7 @@ class PlayerLogs(commands.Cog):
         else:
             emoji = "<:Negative:1438979843252289656>"
             color = discord.Color.red()
+
 
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -185,16 +197,15 @@ class PlayerLogs(commands.Cog):
         embed.set_thumbnail(url=discordname.display_avatar.url)
         embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
+
         log_channel = self.bot.get_channel(1443545539445653604)
 
         if log_channel:
             await log_channel.send(embed=embed)
 
-        logs = load_logs()
 
-        if logs is None:
-            logs = []
-        
+        logs = await asyncio.to_thread(load_logs)
+
         logs.append({
             "action": action.value,
             "discord_id": str(discordname.id),
@@ -206,10 +217,12 @@ class PlayerLogs(commands.Cog):
             "reason": reason
         })
 
-        save_logs(logs)
+
+        await asyncio.to_thread(save_logs, logs)
+
 
         await interaction.followup.send(
-            "✅ Player log created Pookie :D",
+            "✅ Player log created",
             ephemeral=True
         )
 
@@ -220,37 +233,48 @@ class PlayerLogs(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        logs = load_logs()
+        logs = await asyncio.to_thread(load_logs)
+
         results = []
 
         for log in logs:
+
             if (
                 search == log["discord_id"]
-                or search.lower() == log["ign"].lower()
-                or search == log["date"]
+                or search.lower() in log["ign"].lower()
+                or search in log["date"]
             ):
                 results.append(log)
 
+
         if not results:
-            await interaction.followup.send("❌ No logs found.", ephemeral=True)
+
+            await interaction.followup.send(
+                "❌ No logs found",
+                ephemeral=True
+            )
             return
+
 
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+
         await interaction.followup.send(
-            f"📜 Found {len(results)} log(s) for `{search}`:",
+            f"📜 Found {len(results)} log(s) for `{search}`",
             ephemeral=True
         )
+
 
         for log in results:
 
             try:
                 user = await self.bot.fetch_user(int(log["discord_id"]))
                 mention = user.mention
-                avatar_url = user.display_avatar.url
+                avatar = user.display_avatar.url
             except:
                 mention = f"<@{log['discord_id']}>"
-                avatar_url = None
+                avatar = None
+
 
             if log["action"] in ["Recruitment", "Promotion"]:
                 emoji = "<:Plus:1438977678890766517>"
@@ -259,12 +283,14 @@ class PlayerLogs(commands.Cog):
                 emoji = "<:Negative:1438979843252289656>"
                 color = discord.Color.red()
 
+
             try:
                 parsed_date = datetime.strptime(log["date"], "%d/%m/%Y")
-                day_name = parsed_date.strftime("%A")
-                formatted_date = f"{log['date']} [{day_name}]"
+                day = parsed_date.strftime("%A")
+                formatted_date = f"{log['date']} [{day}]"
             except:
                 formatted_date = log["date"]
+
 
             embed = discord.Embed(
                 description=f"""
@@ -285,8 +311,8 @@ class PlayerLogs(commands.Cog):
                 color=color
             )
 
-            if avatar_url:
-                embed.set_thumbnail(url=avatar_url)
+            if avatar:
+                embed.set_thumbnail(url=avatar)
 
             embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
