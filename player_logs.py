@@ -4,7 +4,6 @@ from discord.ext import commands
 from datetime import datetime
 from utils import is_staff
 import sqlite3
-import os
 
 DB_FILE = "player_logs.db"
 
@@ -33,7 +32,7 @@ def init_db():
 
 def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -57,7 +56,7 @@ def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
 
 def search_logs(search):
 
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -66,6 +65,7 @@ def search_logs(search):
     WHERE discord_id = ?
     OR LOWER(ign) LIKE ?
     OR date LIKE ?
+    ORDER BY id DESC
     """, (
         search,
         f"%{search.lower()}%",
@@ -107,12 +107,12 @@ class PlayerLogs(commands.Cog):
         reason: str
     ):
 
-        await interaction.response.defer(ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
 
         try:
             parsed = datetime.strptime(date, "%d/%m/%Y")
             formatted_date = f"{date} [{parsed.strftime('%A')}]"
-
         except ValueError:
             await interaction.followup.send(
                 "❌ Invalid date format. Use **DD/MM/YYYY**",
@@ -120,14 +120,12 @@ class PlayerLogs(commands.Cog):
             )
             return
 
-
         if action.value in ["Recruitment", "Promotion"]:
             emoji = "<:Plus:1438977678890766517>"
             color = discord.Color.green()
         else:
             emoji = "<:Negative:1438979843252289656>"
             color = discord.Color.red()
-
 
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -158,17 +156,19 @@ class PlayerLogs(commands.Cog):
         if log_channel:
             await log_channel.send(embed=embed)
 
-
-        save_log(
-            action.value,
-            str(discordname.id),
-            ign,
-            team1,
-            team2,
-            date,
-            trackerid,
-            reason
-        )
+        try:
+            save_log(
+                action.value,
+                str(discordname.id),
+                ign,
+                team1,
+                team2,
+                date,
+                trackerid,
+                reason
+            )
+        except Exception as e:
+            print("Database error:", e)
 
         await interaction.followup.send(
             "✅ Player log created",
@@ -180,9 +180,18 @@ class PlayerLogs(commands.Cog):
     @is_staff()
     async def playerhistory(self, interaction: discord.Interaction, search: str):
 
-        await interaction.response.defer(ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
 
-        rows = search_logs(search)
+        try:
+            rows = search_logs(search)
+        except Exception as e:
+            print("Search error:", e)
+            await interaction.followup.send(
+                "❌ Database error occurred.",
+                ephemeral=True
+            )
+            return
 
         if not rows:
             await interaction.followup.send(
@@ -191,14 +200,12 @@ class PlayerLogs(commands.Cog):
             )
             return
 
-
         divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         await interaction.followup.send(
             f"📜 Found {len(rows)} log(s) for `{search}`",
             ephemeral=True
         )
-
 
         for action, discord_id, ign, team1, team2, date, trackerid, reason in rows:
 
@@ -210,7 +217,6 @@ class PlayerLogs(commands.Cog):
                 mention = f"<@{discord_id}>"
                 avatar = None
 
-
             if action in ["Recruitment", "Promotion"]:
                 emoji = "<:Plus:1438977678890766517>"
                 color = discord.Color.green()
@@ -218,13 +224,11 @@ class PlayerLogs(commands.Cog):
                 emoji = "<:Negative:1438979843252289656>"
                 color = discord.Color.red()
 
-
             try:
                 parsed = datetime.strptime(date, "%d/%m/%Y")
                 formatted_date = f"{date} [{parsed.strftime('%A')}]"
             except:
                 formatted_date = date
-
 
             embed = discord.Embed(
                 description=f"""
@@ -250,7 +254,10 @@ class PlayerLogs(commands.Cog):
 
             embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
-            await interaction.followup.send(embed=embed)
+            try:
+                await interaction.followup.send(embed=embed)
+            except discord.NotFound:
+                return
 
 
 async def setup(bot):
