@@ -6,7 +6,7 @@ from utils import is_staff
 import psycopg2
 import os
 
-DATABASE_URL = os.getenv(DATABASE_URL, sslmode="require")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 conn = psycopg2.connect(
     host="aws-1-ap-south-1.pooler.supabase.com",
@@ -17,8 +17,10 @@ conn = psycopg2.connect(
     sslmode="require"
 )
 
-conn = psycopg2.connect(DATABASE_URL)
+conn = psycopg2.connect(DATABASE_URL, sslmode="require")
 cursor = conn.cursor()
+
+print("DATABASE_URL:", DATABASE_URL)
 
 
 def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
