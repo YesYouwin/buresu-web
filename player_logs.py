@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from utils import is_staff
+import traceback
 import psycopg2
 import os
 
@@ -172,10 +173,14 @@ class PlayerLogs(commands.Cog):
         # Fetch logs
         try:
             rows = search_logs(search)
-        except Exception as e:
-            print("Database error:", e)
+        except Exception:
+            error_msg = traceback.format_exc()
+
+            print(error_msg)
+
             await interaction.followup.send(
-                "❌ Database error while searching logs.", ephemeral=True
+                f"❌ Database Error:\n```{error_msg[:1900]}```",
+                 ephemeral=True
             )
             return
 
