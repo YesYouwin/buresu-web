@@ -6,6 +6,7 @@ from utils import is_staff
 import traceback
 import asyncio
 import psycopg2
+from psycopg2.pool import SimpleConnectionPool
 import os
 
 # ----------------------------
@@ -16,52 +17,64 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set in environment variables!")
 
-# Create ONE persistent connection
-conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+# Connection pool
+pool = SimpleConnectionPool(
+    1,
+    10,
+    DATABASE_URL,
+    sslmode="require"
+)
 
 def get_conn():
-    return conn
+    return pool.getconn()
 
+def return_conn(conn):
+    pool.putconn(conn)
 
 # ----------------------------
 # DATABASE FUNCTIONS
 # ----------------------------
 def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
-    """Insert a player log into the database."""
     conn = get_conn()
 
-    with conn.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO player_logs
-            (action, discord_id, ign, team1, team2, date, trackerid, reason)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-            """,
-            (action, discord_id, ign, team1, team2, date, trackerid, reason),
-        )
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO player_logs
+                (action, discord_id, ign, team1, team2, date, trackerid, reason)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                """,
+                (action, discord_id, ign, team1, team2, date, trackerid, reason),
+            )
 
-    conn.commit()
+        conn.commit()
+
+    finally:
+        return_conn(conn)
 
 
 def search_logs(search):
-    """Search player logs by discord id, IGN, or date."""
     conn = get_conn()
 
-    with conn.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT action, discord_id, ign, team1, team2, date, trackerid, reason
-            FROM player_logs
-            WHERE discord_id::text = %s
-            OR LOWER(ign) LIKE %s
-            OR date LIKE %s
-            ORDER BY id DESC
-            """,
-            (search, f"%{search.lower()}%", f"%{search}%"),
-        )
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT action, discord_id, ign, team1, team2, date, trackerid, reason
+                FROM player_logs
+                WHERE discord_id::text = %s
+                OR LOWER(ign) LIKE %s
+                OR date LIKE %s
+                ORDER BY id DESC
+                """,
+                (search, f"%{search.lower()}%", f"%{search}%"),
+            )
 
-        return cursor.fetchall()
+            return cursor.fetchall()
 
+    finally:
+        return_conn(conn)
 
 # ----------------------------
 # COG
@@ -99,7 +112,6 @@ class PlayerLogs(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-        # Validate date
         try:
             parsed = datetime.strptime(date, "%d/%m/%Y")
             formatted_date = f"{date} [{parsed.strftime('%A')}]"
@@ -145,13 +157,11 @@ class PlayerLogs(commands.Cog):
         embed.set_thumbnail(url=discordname.display_avatar.url)
         embed.set_footer(text=f"© Buresu • {datetime.now().year}")
 
-        # Send embed to log channel
         log_channel = self.bot.get_channel(1443545539445653604)
 
         if log_channel:
             await log_channel.send(embed=embed)
 
-        # Save to database
         try:
             await asyncio.to_thread(
                 save_log,
@@ -180,11 +190,9 @@ class PlayerLogs(commands.Cog):
 
         search = search.strip()
 
-        # Convert Discord mention → ID
         if search.startswith("<@") and search.endswith(">"):
             search = search.replace("<@", "").replace(">", "").replace("!", "")
 
-        # Fetch logs
         try:
             rows = await asyncio.to_thread(search_logs, search)
         except Exception:
@@ -208,7 +216,6 @@ class PlayerLogs(commands.Cog):
             f"📜 Found **{len(rows)}** log(s) for `{search}`", ephemeral=True
         )
 
-        # Display logs
         for action, discord_id, ign, team1, team2, date, trackerid, reason in rows:
 
             try:
