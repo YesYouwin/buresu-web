@@ -16,10 +16,11 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is not set in environment variables!")
 
+# Create ONE persistent connection
+conn = psycopg2.connect(DATABASE_URL, sslmode="require")
 
 def get_conn():
-    """Create a new database connection."""
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    return conn
 
 
 # ----------------------------
@@ -27,34 +28,39 @@ def get_conn():
 # ----------------------------
 def save_log(action, discord_id, ign, team1, team2, date, trackerid, reason):
     """Insert a player log into the database."""
-    with get_conn() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO player_logs
-                (action, discord_id, ign, team1, team2, date, trackerid, reason)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                """,
-                (action, discord_id, ign, team1, team2, date, trackerid, reason),
-            )
+    conn = get_conn()
+
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO player_logs
+            (action, discord_id, ign, team1, team2, date, trackerid, reason)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            """,
+            (action, discord_id, ign, team1, team2, date, trackerid, reason),
+        )
+
+    conn.commit()
 
 
 def search_logs(search):
     """Search player logs by discord id, IGN, or date."""
-    with get_conn() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT action, discord_id, ign, team1, team2, date, trackerid, reason
-                FROM player_logs
-                WHERE discord_id::text = %s
-                OR LOWER(ign) LIKE %s
-                OR date LIKE %s
-                ORDER BY id DESC
-                """,
-                (search, f"%{search.lower()}%", f"%{search}%"),
-            )
-            return cursor.fetchall()
+    conn = get_conn()
+
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT action, discord_id, ign, team1, team2, date, trackerid, reason
+            FROM player_logs
+            WHERE discord_id::text = %s
+            OR LOWER(ign) LIKE %s
+            OR date LIKE %s
+            ORDER BY id DESC
+            """,
+            (search, f"%{search.lower()}%", f"%{search}%"),
+        )
+
+        return cursor.fetchall()
 
 
 # ----------------------------
@@ -172,13 +178,12 @@ class PlayerLogs(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
 
-
         search = search.strip()
 
         # Convert Discord mention → ID
         if search.startswith("<@") and search.endswith(">"):
             search = search.replace("<@", "").replace(">", "").replace("!", "")
-        
+
         # Fetch logs
         try:
             rows = await asyncio.to_thread(search_logs, search)
