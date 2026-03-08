@@ -134,7 +134,7 @@ class PlayerLogs(commands.Cog):
             else discord.Color.red()
         )
 
-        divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         embed = discord.Embed(
             description=f"""
@@ -233,7 +233,7 @@ class PlayerLogs(commands.Cog):
             await interaction.followup.send("❌ No logs found.", ephemeral=True)
             return
 
-        divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        divider = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
         await interaction.followup.send(
             f"📜 Found **{len(rows)}** log(s) for `{search}`", ephemeral=True
