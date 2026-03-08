@@ -15,7 +15,9 @@ conn = psycopg2.connect(
     password=os.getenv("DB_PASSWORD"),
     port=5432,
     sslmode="require"
-)conn = psycopg2.connect(DATABASE_URL)
+)
+
+conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 
