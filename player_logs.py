@@ -181,7 +181,7 @@ class PlayerLogs(commands.Cog):
 
         except asyncio.TimeoutError:
             await interaction.followup.send(
-                "❌ Database request timed out.",
+                f"❌ Database Timeout:\n```{error_msg[:1900]}```",
                 ephemeral=True
             )
             return
