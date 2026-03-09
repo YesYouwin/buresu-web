@@ -66,11 +66,16 @@ bot.setup_hook = setup_hook
 # ----------------------------
 # BOT READY EVENT
 # ----------------------------
-
 @bot.event
 async def on_ready():
+
+    bot.tree.clear_commands(guild=None)  # remove old commands
+
     await bot.tree.sync()
+
     print(f"Logged in as {bot.user}")
+    
+
 
 # ----------------------------
 # START BOT
