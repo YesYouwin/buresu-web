@@ -69,6 +69,7 @@ bot.setup_hook = setup_hook
 
 @bot.event
 async def on_ready():
+    await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
 # ----------------------------
