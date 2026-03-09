@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 import asyncio
-from utils import is_staff
+from commands.staff.utils import is_staff
 
 
 VALORANT_MAPS = [
