@@ -9,7 +9,7 @@ from threading import Thread
 # KEEP ALIVE SERVER
 # -----------------------------
 
-app = Flask("")
+app = Flask(__name__)
 
 @app.route("/")
 def home():
@@ -20,6 +20,7 @@ def run():
 
 def keep_alive():
     t = Thread(target=run)
+    t.daemon = True
     t.start()
 
 
@@ -28,7 +29,15 @@ def keep_alive():
 # -----------------------------
 
 TOKEN = os.getenv("TOKEN")
-GUILD_ID = int(os.getenv("GUILD_ID"))
+GUILD_ID = os.getenv("GUILD_ID")
+
+if not TOKEN:
+    raise RuntimeError("TOKEN environment variable is missing!")
+
+if not GUILD_ID:
+    raise RuntimeError("GUILD_ID environment variable is missing!")
+
+GUILD_ID = int(GUILD_ID)
 
 
 # -----------------------------
@@ -47,6 +56,8 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # -----------------------------
 
 async def setup_hook():
+
+    print("Loading command modules...")
 
     for root, dirs, files in os.walk("./commands"):
         for file in files:
