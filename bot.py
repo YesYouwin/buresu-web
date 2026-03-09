@@ -4,9 +4,10 @@ import os
 from flask import Flask
 from threading import Thread
 
-# ----------------------------
+
+# -----------------------------
 # KEEP ALIVE SERVER
-# ----------------------------
+# -----------------------------
 
 app = Flask("")
 
@@ -21,11 +22,18 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# ----------------------------
-# DISCORD BOT SETUP
-# ----------------------------
+
+# -----------------------------
+# ENV VARIABLES
+# -----------------------------
 
 TOKEN = os.getenv("TOKEN")
+GUILD_ID = int(os.getenv("GUILD_ID"))
+
+
+# -----------------------------
+# BOT SETUP
+# -----------------------------
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -33,16 +41,18 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ----------------------------
-# LOAD COMMANDS FROM FOLDERS
-# ----------------------------
+
+# -----------------------------
+# AUTO LOAD COMMANDS
+# -----------------------------
 
 async def setup_hook():
 
     for root, dirs, files in os.walk("./commands"):
         for file in files:
+
             if file.endswith(".py") and not file.startswith("__"):
-                
+
                 path = os.path.join(root, file)
 
                 module = (
@@ -55,31 +65,34 @@ async def setup_hook():
                 try:
                     await bot.load_extension(module)
                     print(f"Loaded {module}")
+
                 except Exception as e:
                     print(f"Failed to load {module}: {e}")
 
-    await bot.tree.sync()
-    print("Slash commands synced")
 
 bot.setup_hook = setup_hook
 
-# ----------------------------
-# BOT READY EVENT
-# ----------------------------
+
+# -----------------------------
+# READY EVENT
+# -----------------------------
+
 @bot.event
 async def on_ready():
 
-    bot.tree.clear_commands(guild=None)  # remove old commands
+    guild = discord.Object(id=GUILD_ID)
 
-    await bot.tree.sync()
+    bot.tree.clear_commands(guild=guild)
+
+    await bot.tree.sync(guild=guild)
 
     print(f"Logged in as {bot.user}")
-    
+    print("Commands synced to development server.")
 
 
-# ----------------------------
+# -----------------------------
 # START BOT
-# ----------------------------
+# -----------------------------
 
 keep_alive()
 bot.run(TOKEN)
