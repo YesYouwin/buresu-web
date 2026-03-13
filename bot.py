@@ -5,9 +5,9 @@ from flask import Flask
 from threading import Thread
 
 
-# ------------------------------
+# -----------------------------
 # KEEP ALIVE SERVER
-# ------------------------------
+# -----------------------------
 
 app = Flask(__name__)
 
